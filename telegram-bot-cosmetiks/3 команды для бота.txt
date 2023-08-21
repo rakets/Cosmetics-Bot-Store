@@ -1,0 +1,217 @@
+Телеграм бота принято писать при помощи модульной системы.
+
+! Сейчас разьбем код бота по категориям,позже переделаем код по модулям. !
+ 
+Декоратор с командой.Берем тот же самый декоратор dp.message_handler() и вместо пустого записываем пар-р commands
+и записываем комманды,на которые бот должен реагировать при помощи этого хендлера(при помощи этого события).
+	@dp.message_handler(commands=)
+Как правило у любого бота должна быть команда start и help.
+Иногда команды /start и /help пишут отдельно,но чаще всего их объединяют:
+	@dp.message_handler(commands=['start', 'help'])
+Разделять их считается плохим тоном.
+Этот хендлер сработает тогда,когда пользователь напишет команду /start или /help,так же этот хендлер сработает тогда,
+когда пользоывтель добавится к нашему боту.
+----
+В хендлере записываем ассинхронну ф-ию и даем ей имя commands_starts,в пар-р записываем пар-р message,записываем для него аннотацию 
+типа types.Message.И записываем код,который сработает во время события start или help.'''
+	async def commands_start(message : types.Message):
+при помощи метода await bot.send_message() (отправку сообщения конкретно в л.с пользователя).
+(получаем id отправителя(message),получаем id пользователя(from_user.id) и пишем ответ на комманду start.Третьим аргументом мы будем
+отправлять ему клавиатуру (в дальнейшем описании)
+	await bot.send_message(message.from_user.id, 'Приятного аппетита')
+так же добавляем удаление сообщения с общего чата
+	await message.delete()
+
+вид хэндлера и функции на данный момент:
+	@dp.message_handler(commands=["start","help"])
+	async def message_send(message : types.Message):
+    		await bot.send_message(message.from_user.id, 'Добро пожаловать!')
+    		await message.delete()
+----------------
+нужно добавить ошибку случая,если чел написал в группу,но не добавлялся к боту.В тг ботам запрещено отправлять сообщения,если чел
+не добавился к нему.Необходимо добавить конструкцию try except(т.е грубо говоря мы просто обрабатываем с вами ошибку).Если у нас не получится
+отправить сообщение в личку,здесь его будем удалять что бы оно там не висело await message.delete().Далее пишем except и await message.reply().
+в данном случае мы высылаем ссылку на бота.
+	@dp.message_handler(commands=["start","help"])
+	async def message_send(message : types.Message):
+    		try:
+        		await bot.send_message(message.from_user.id, 'Добро пожаловать!')
+        		await message.delete()
+    		except:
+        		bot_message = await message.reply('Общение с ботом через ЛС, напишите ему : \nhttps://t.me/pizza_mune_bot')
+---------------------
+Мы пишем столько обработчиков,сколько у нас будет команд.Главное-пустой обработчик(пустой хендлер,в который попадают любые сообщ) должен быть
+в самом низу!Т.к тг проверяет все хендлеры сверху-вниз,поэтому если поставить его вверху,то сообщения будут улавливаться в нем и не будут идти 
+по другим хендлерам.
+
+
+@dp.message_handler(commands=["start","help"])		#хендлер на команды start и help
+async def message_send(message : types.Message):
+    try:
+        await bot.send_message(message.from_user.id, 'Добро пожаловать!')
+        await message.delete()
+    except:
+        await message.reply('Общение с ботом через ЛС, напишите ему : \nhttps://t.me/pizza_mune_bot')
+
+@dp.message_handler()                      	 	#общий хендлер
+async def echo_send(message : types.Message):
+    print('обработчик событий запущен')
+    await bot.send_message(message.from_user.id, message.text)
+
+    if message.text == 'привет' or message.text == 'Привет':
+         print('ответное сообщение на "Привет" отправлено')
+         await message.answer('И тебе привет')      
+    else:
+         await message.answer(message.text)
+
+executor.start_polling(dp, skip_updates=True) #команда запуска нажего бота
+---------------------
+Добавляем еще необходимые обработчики команд (в данном случ Режим работы и Расположение),если пользователь написал в общий чат 
+ответ будет отправляться в личные сообщения:
+
+@dp.message_handler(commands=['start', 'help'])
+async def commands_start(message : types.Message):
+    try:
+        await bot.send_message(message.from_user.id, 'Приятного аппетита')
+        await message.delete()
+    except:
+        await message.reply('Общение с ботом через ЛС, напишите ему : \nhttps://t.me/cosmetic_menu_bot')
+
+@dp.message_handler(commands=['Режим_работы'])
+async def pizza_open_command(message : types.Message):
+    await bot.send_message(message.from_user.id, 'Вт-Чт с 9:00 до 20:00, Пт-Сб с 10:00 до 23:00')
+
+@dp.message_handler(commands=['Расположение'])
+async def pizza_place_command(message : types.Message):
+    await bot.send_message(message.from_user.id, 'ул.Колбасная 15')
+
+@dp.message_handler()                      	 	#общий хендлер(декоратор событий,что в чат кто-то вообще пишет)
+async def echo_send(message : types.Message):
+    print('обработчик событий запущен(уловил сообщение)')
+    await bot.send_message(message.from_user.id, message.text)
+
+    if message.text == 'привет' or message.text == 'Привет':
+         print('ответное сообщение на "Привет" отправлено')
+         await message.answer('И тебе привет')
+    else:
+         await message.answer(message.text)
+
+executor.start_polling(dp, skip_updates=True) #команда запуска нажего бота
+------------------------------
+
+----Таким образом пока что у нас создалась Клиентская часть:----
+
+'''-----------------------КЛИЕНТСКАЯ ЧАСТЬ--------------------------------'''
+@dp.message_handler(commands=['start', 'help'])
+async def commands_start(message : types.Message):
+    try:
+        await bot.send_message(message.from_user.id, 'Приятного аппетита')
+        await message.delete()
+    except:
+        await message.reply('Общение с ботом через ЛС, напишите ему : \nhttps://t.me/cosmetic_menu_bot')
+
+@dp.message_handler(commands=['Режим_работы'])
+async def pizza_open_command(message : types.Message):
+    await bot.send_message(message.from_user.id, 'Вт-Чт с 9:00 до 20:00, Пт-Сб с 10:00 до 23:00')
+
+@dp.message_handler(commands=['Расположение'])
+async def pizza_place_command(message : types.Message):
+    await bot.send_message(message.from_user.id, 'ул.Колбасная 15')
+
+'''-----------------------КЛИЕНТСКАЯ-ЧАСТЬ--------------------------------'''
+
+и общая часть:
+
+'''-----------------------ОБЩАЯ-ЧАСТЬ--------------------------------'''
+
+@dp.message_handler()                      	 	#общий хендлер(декоратор событий,что в чат кто-то вообще пишет)
+async def echo_send(message : types.Message):
+    print('обработчик событий запущен(уловил сообщение)')
+    await bot.send_message(message.from_user.id, message.text)
+
+    if message.text == 'привет' or message.text == 'Привет':
+         print('ответное сообщение на "Привет" отправлено')
+         await message.answer('И тебе привет')
+    else:
+         await message.answer(message.text)
+
+executor.start_polling(dp, skip_updates=True) #команда запуска нажего бота
+
+'''-----------------------ОБЩАЯ-ЧАСТЬ--------------------------------'''
+----------------------------------------------------------------------------------
+При срабатывании любого хендлера можно выполнить любой код,который нам необходим,не обязательно,что бы он выводил что-то в чат.
+----------------------------
+Запишем ф-ию которая запускается во время старта(выхода бота в онлайн)
+в данном случае декоратор не нужен,просто записываем ассинхронную ф-ию и называем on_startup()(называть ее нужно точно так же) в параметрах записываем '_'
+и далее записываем код,который необходим нам в этой ф-ии(что бы он сообщал,что подключился,подключался к базе данных).
+	async def on_startup(_):
+	    	print('Бот вышел в онлайн')
+
+Что бы запустить эту ф-ию ее нужно передать в экзекьютер(в экзекьютер записываем третий аргумент (пар-р on_startup,в который
+нам необходимо передать ф-ию,которая так и называется on_startup).Теперь экзекьютер будет выглядеть так:
+	executor.start_polling(dp, skip_updates=True, on_startup = on_startup)
+
+
+
+
+
+________________________________________________________________________________
+_________________КОД БОТА ПОСЛЕ ЗАВЕРШЕНИЯ ЭТОЙ ЧАСТИ___________________________
+
+from aiogram.utils import executor          #из aiogram.utils импортируем executor что бы запустить бота,что бы он вышел в онлайн
+from aiogram import Bot,types               #импортируем класс Bot и types(спец.типы данных,что бы можно было писать аннотации типов в функциях
+from aiogram.dispatcher import Dispatcher   #из aiogram.dispatcher импорт класса Dispatcher(бот сможет улавливать события)
+
+#from config_bot_cosmetiks import TOKEN
+
+import os                                   #импорт модуля os,что бы могли прочитать токен из переменной среды окружения
+
+'''-------логинг ошибок------'''
+import logging
+logging.basicConfig(level=logging.INFO)
+'''-------логинг ошибок------'''
+
+bot = Bot(token=os.getenv('TOKEN'))           #инициализируем бота и читаем токен
+# bot = Bot(token=TOKEN)                          #инициализируем бота и читаем токен
+
+dp = Dispatcher(bot)                        #инициализируем dispatcher и передаем туда экземпляр нашего бота
+
+async def on_startup(_):
+    print('бот вышел в чат')
+
+'''-----------------------КЛИЕНТСКАЯ ЧАСТЬ--------------------------------'''
+@dp.message_handler(commands=['start', 'help'])
+async def commands_start(message : types.Message):
+    try:
+        await bot.send_message(message.from_user.id, 'Приятного аппетита')
+        await message.delete()
+    except:
+        await message.reply('Общение с ботом через ЛС, напишите ему : \nhttps://t.me/cosmetic_menu_bot')
+
+@dp.message_handler(commands=['Режим_работы'])
+async def pizza_open_command(message : types.Message):
+    await bot.send_message(message.from_user.id, 'Вт-Чт с 9:00 до 20:00, Пт-Сб с 10:00 до 23:00')
+
+@dp.message_handler(commands=['Расположение'])
+async def pizza_place_command(message : types.Message):
+    await bot.send_message(message.from_user.id, 'ул.Колбасная 15')
+
+'''-----------------------КЛИЕНТСКАЯ-ЧАСТЬ--------------------------------'''
+
+'''-----------------------ОБЩАЯ-ЧАСТЬ--------------------------------'''
+
+@dp.message_handler()                      	 	#общий хендлер(декоратор событий,что в чат кто-то вообще пишет)
+async def echo_send(message : types.Message):
+    print('обработчик событий запущен(уловил сообщение)')
+    await bot.send_message(message.from_user.id, message.text)
+
+    if message.text == 'привет' or message.text == 'Привет':
+         print('ответное сообщение на "Привет" отправлено')
+         await message.answer('И тебе привет')
+    else:
+         await message.answer(message.text)
+
+executor.start_polling(dp, skip_updates=True, on_startup = on_startup) #команда запуска нажего бота
+
+'''-----------------------ОБЩАЯ-ЧАСТЬ--------------------------------'''
+

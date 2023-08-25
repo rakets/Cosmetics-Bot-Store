@@ -1,7 +1,5 @@
-import string
-
 from aiogram.utils import executor          #из aiogram.utils импортируем executor что бы запустить бота,что бы он вышел в онлайн
-from aiogram import Bot,types               #импортируем класс Bot и types(спец.типы данных,что бы можно было писать аннотации типов в функциях
+from aiogram import Bot                     #импортируем класс Bot и types(спец.типы данных,что бы можно было писать аннотации типов в функциях).При разбивке по модулям types отсюда убралось.
 from aiogram.dispatcher import Dispatcher   #из aiogram.dispatcher импорт класса Dispatcher(бот сможет улавливать события)
 
 # from config_bot_cosmetiks import TOKEN
@@ -39,52 +37,11 @@ async def on_startup(_):
 '''----------------------------------------------------------------------'''
 
 '''-----------------------КЛИЕНТСКАЯ ЧАСТЬ--------------------------------'''
-@dp.message_handler(commands=['start', 'help'])
-async def commands_start(message : types.Message):
-    try:
-        await bot.send_message(message.from_user.id, 'Приятного аппетита')
-        await message.delete()
-    except:
-        await message.reply('Общение с ботом через ЛС, напишите ему : \nhttps://t.me/cosmetic_menu_bot')
-
-@dp.message_handler(commands=['Режим_работы'])
-async def pizza_open_command(message : types.Message):
-    await message.delete()
-    await bot.send_message(message.from_user.id,'Режим работы : Вт-Чт с 9:00 до 20:00, Пт-Сб с 10:00 до 23:00')
-
-@dp.message_handler(commands=['Расположение'])
-async def pizza_place_command(message : types.Message):
-    await message.delete()
-    await bot.send_message(message.from_user.id,'Адрес : ул.Колбасная 15')
 
 '''-----------------------КЛИЕНТСКАЯ-ЧАСТЬ--------------------------------'''
 
 '''-----------------------ОБЩАЯ-ЧАСТЬ--------------------------------'''
 
-# @dp.message_handler()                      	 	                        #общий хендлер(декоратор событий,что в чат кто-то вообще пишет)
-# async def echo_send(message : types.Message):
-#     print('обработчик событий запущен(уловил сообщение)')
-#
-#     # await bot.send_message(message.from_user.id, message.text)          #бот высылает пользователю тоже самое сообщение
-#
-#     if message.text == 'привет' or message.text == 'Привет':
-#          print('ответное сообщение на "Привет" отправлено')
-#          await message.answer('И тебе привет')
-#
-#     # else:
-#     #      await message.answer(message.text)
-
-@dp.message_handler()
-async def echo_send_mat(message : types.Message):
-    if {i.lower().translate(str.maketrans('', '', string.punctuation)) for i in message.text.split(' ')}\
-        .intersection(set(json.load(open("cenz_cosmetiks.json")))) != set():
-        # await message.reply('maty zapreszeny')
-        user = message.from_user                                            #получение объекта user,что бы после получить из него имя пользователя
-        await message.answer(f'{user.first_name}!Маты запрещены!')          #достаем имя пользователя через user.first_name
-        await message.delete()
-
-
-executor.start_polling(dp, skip_updates=True, on_startup = on_startup)      #команда запуска нажего бота
 
 '''-----------------------ОБЩАЯ-ЧАСТЬ--------------------------------'''
 

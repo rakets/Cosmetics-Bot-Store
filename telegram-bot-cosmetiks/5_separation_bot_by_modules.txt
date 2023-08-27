@@ -1,0 +1,361 @@
+Создаем новую папку handlers.
+--------
+(1)В этой папке создаем 3 отдельных файла(admin,client,other).
+--------
+(2) И в этой папке нам нужно создать файл с именем __init__ и расширением .py.Этот файл нужен
+что бы организовать пакет из нашей папки хендлерс.
+В файл __init__ запишем импорты всех модулей(admin,client,other).Это получается пакет.
+В основной файл bot_telegram будем импортировать пакет для удобства импортов.
+Записываем импорты всех документов(from import).Т.к интерпретатор будет исполняться,
+точкой входа файл bot_telegram.py,то нам нужно импортировать не на прямую(напиример import 
+admin в файл init),то нам нужно отталкиваться по иерархии пути от папки handlers,которую видит
+в данном случаем интерпретатор.
+Первым записываем импорт части клиента(потому что он по иерархии хендлера,в которой у нас 
+прописаны - первый).
+	from handlers import client
+
+Далее записываем остальные импорты(admin,other).
+	from handlers import admin
+	from handlers import other
+
+Сохраняем.Файл init заканчиваем писать.
+---------
+(3) Теперь начинаем разделять хендлеры.У нас есть основной файл,в котором все прописано(пока что).
+
+(3.1) Все хендлеры из клиентской части переносим в файл client.Далее нужно сделать соответствуеющие
+импорты(то,что используем здесь из библиотеки aiogram).В данному случае это types.
+Пишем from aiogram import types.На этом пока что все.
+
+-----Код клиентского модуля:
+
+from aiogram import types
+
+@dp.message_handler(commands=['start', 'help'])
+async def commands_start(message : types.Message):
+    try:
+        await bot.send_message(message.from_user.id, 'Приятного аппетита')
+        await message.delete()
+    except:
+        await message.reply('Общение с ботом через ЛС, напишите ему : \nhttps://t.me/cosmetic_menu_bot')
+
+@dp.message_handler(commands=['Режим_работы'])
+async def pizza_open_command(message : types.Message):
+    await message.delete()
+    await bot.send_message(message.from_user.id,'Режим работы : Вт-Чт с 9:00 до 20:00, Пт-Сб с 10:00 до 23:00')
+
+@dp.message_handler(commands=['Расположение'])
+async def pizza_place_command(message : types.Message):
+    await message.delete()
+    await bot.send_message(message.from_user.id,'Адрес : ул.Колбасная 15')
+-------------------------
+(3.2) Так же переносим хендлер в общую часть(other).Тут тоже из aiogram нужно импортировать types.
+Так же из главного файла в этот нужно перенести ипорт json и string (их используем для фильтра мата)
+	from aiogram import types
+	import string
+	import json
+ 
+----Код части other:
+
+from aiogram import types
+import string
+import json
+
+'''----тут у нас был декоратор,который улавливает любые сообщения----'''
+# @dp.message_handler()                       #декоратор события,что в чат кто-то что-то пишет вообще
+# async def echo_send(message : types.Message):
+#     print('обработчик событий запущен')
+#     await bot.send_message(message.from_user.id, message.text)
+#
+#     # if message.text == 'привет' or message.text == 'Привет':
+#     #     print('ответное сообщение на "Привет" отправлено')
+#     #     await message.answer('И тебе привет')      #отправка ответного сообщение нашим ботом.
+#     # else:
+#     #     await message.answer(message.text)
+'''----------------------------------------------------------------------'''
+# @dp.message_handler()                      	 	                        #общий хендлер(декоратор событий,что в чат кто-то вообще пишет)
+# async def echo_send(message : types.Message):
+#     print('обработчик событий запущен(уловил сообщение)')
+#
+#     # await bot.send_message(message.from_user.id, message.text)          #бот высылает пользователю тоже самое сообщение
+#
+#     if message.text == 'привет' or message.text == 'Привет':
+#          print('ответное сообщение на "Привет" отправлено')
+#          await message.answer('И тебе привет')
+#
+#     # else:
+#     #      await message.answer(message.text)
+
+@dp.message_handler()
+async def echo_send_mat(message : types.Message):
+    if {i.lower().translate(str.maketrans('', '', string.punctuation)) for i in message.text.split(' ')}\
+        .intersection(set(json.load(open("cenz_cosmetiks.json")))) != set():
+        # await message.reply('maty zapreszeny')
+        user = message.from_user                                            #получение объекта user,что бы после получить из него имя пользователя
+        await message.answer(f'{user.first_name}!Маты запрещены!')          #достаем имя пользователя через user.first_name
+        await message.delete()
+
+---------------------
+
+Теперь в основном файле(bot_telegram) убираем импорт types,оставляем только бота,диспетчера и 
+экзекьютера.
+Заметьте,в дополнительных файлах(admin,client,other) мы используем несколько объектов,которые 
+создаются в основном файле,т.е это dp(диспетчер) и в файле client есть bot(экземпляр бота).На нужно
+эти экземпляры передать в файлы,что бы код работал без ошибок и потом эти же хендлеры нужно передать 
+из доп.файлов передать обратно в гланый файл.
+В питоне такой импорт вызывает ошибку,обойти это можно при помощи кода(но очень громоздко),но есть 
+и другое решение:
+	для этого в осн.папке создаем доп.файл create_bot.py(сохр рядом с основным файлом).
+Это нужно,что бы произвести взаимоимпорты,что бы не было ошибки.
+В файл create_bot переносим все то,что касается создания экземпляров бота(находится в основном файле,
+перед клиентской частью : импорт класса бота и диспетчера и создание экземпляров бота и диспетчера.
+
+	from aiogram import Bot                     #импортируем класс Bot и types(спец.типы данных,что бы можно было писать аннотации типов в функциях).При разбивке по модулям types отсюда убралось.
+	from aiogram.dispatcher import Dispatcher   #из aiogram.dispatcher импорт класса Dispatcher(бот сможет улавливать события)
+
+	# from config_bot_cosmetiks import TOKEN
+	# bot = Bot(token=TOKEN)                    #инициализируем бота и читаем токен
+
+	bot = Bot(token=os.getenv('TOKEN'))         #инициализируем бота и читаем токен
+	dp = Dispatcher(bot)                        #инициализируем dispatcher и передаем туда экземпляр нашего бота
+
+Нужно импортировать модуль os т.к при помощи него мы тут читаем токен.
+	import os
+
+! Промежуточный файл create_bot готов !
+
+---Код файла create_bot:
+
+	from aiogram import Bot                     #импортируем класс Bot и types(спец.типы данных,что бы можно было писать аннотации типов в функциях).При разбивке по модулям types отсюда убралось.
+	from aiogram.dispatcher import Dispatcher   #из aiogram.dispatcher импорт класса Dispatcher(бот сможет улавливать события)
+
+	import os                                   #импорт модуля os,что бы могли прочитать токен из переменной среды окружения
+
+	# from config_bot_cosmetiks import TOKEN
+	# bot = Bot(token=TOKEN)                    #инициализируем бота и читаем токен
+	bot = Bot(token=os.getenv('TOKEN'))         #инициализируем бота и читаем токен
+	dp = Dispatcher(bot)                        #инициализируем dispatcher и передаем туда экземпляр нашего бота
+-------------------------
+В ГЛАВНОМ файле bot_telegram_cosmetiks экзекьютер мы оставляем:
+	from aiogram.utils import executor          #из aiogram.utils импортируем executor что бы запустить бота,что бы он вышел в онлайн
+
+Функцию(код) исполняющуюся во время старта оставляем:
+	async def on_startup(_):
+	print('бот вышел в чат')
+
+	executor.start_polling(dp, skip_updates=True, on_startup = on_startup)      #команда запуска нажего бота
+
+---Код файла bot_telegram_cosmetiks:
+	from aiogram.utils import executor          #из aiogram.utils импортируем executor что бы запустить бота,что бы он вышел в онлайн
+
+	'''-------логинг ошибок------'''
+	import logging
+	logging.basicConfig(level=logging.INFO)
+	'''-------логинг ошибок------'''
+
+	async def on_startup(_):
+		print('бот вышел в чат')
+
+	executor.start_polling(dp, skip_updates=True, on_startup = on_startup)      #команда запуска нажего бота
+---------------------------
+(3.3) Теперь файл(bot_telegram_cosmetiks) - файл входа,который мы запускаем во время старта пулинга бат-файлом,
+в файле create_bot создаются экземпляры бота,поэтому т.к в экзекьютер(в главном файле) нам необходимо 
+передать диспэтчер - в гл.файлн записываем импорт dp из файла create_bot.
+	импортируем диспэтчер,который записываем в executor.start_polling 
+		from create_bot import dp 
+
+---Код главного файла bot_telegram_cosmetiks:
+	from aiogram.utils import executor          #из aiogram.utils импортируем executor что бы запустить бота,что бы он вышел в онлайн
+	from create_bot import dp
+
+	'''-------логинг ошибок------'''
+	import logging
+	logging.basicConfig(level=logging.INFO)
+	'''-------логинг ошибок------'''
+
+	async def on_startup(_):
+    	print('бот вышел в чат')
+
+	executor.start_polling(dp, skip_updates=True, on_startup = on_startup)      #команда запуска нажего бота
+-------------------------------------
+Далее в файл client нужно импортировать диспэтчер dp и бот bot,что бы код работал нормально.Импортировать
+будем из файла create_bot:
+	from create_bot import db,bot
+
+В модель other также импортируем диспэтчер,т.к там отдельный хендлер:
+	from create_bot import dp
+------------------------------------
+Теперь нужно немного по-другому записать хэнделы и передать их в файл старат bot_telegram_cosmetiks.До этого мы сделали
+разводку,что бы не было ошибок импорта(в файле create_bot создали бота,импортировали(передали) его в точку входа(гл.файл) 
+и разнесли по модулям(нашим файлам client,other),в которых содержится код хэнлеров.
+Теперь переписываем хэндлеры в файле client и импортируем их в файл bot_telegram.
+Для этого:
+	декораторы(@dp.message_handler(commands=['start', 'help'] и @dp.message_handler(commands=['Режим_работы'])
+	и @dp.message_handler(commands=['Расположение']) из файла client) нам не нужны(закоментируем) если пишем
+	однофайлового бота
+	
+	from aiogram import types
+	from create_bot import bot,dp
+
+	# @dp.message_handler(commands=['start', 'help'])
+	async def commands_start(message : types.Message):
+    		try:
+        		await bot.send_message(message.from_user.id, 'Приятного аппетита')
+        		await message.delete()
+    		except:
+        		await message.reply('Общение с ботом через ЛС, напишите ему : \nhttps://t.me/cosmetic_menu_bot')
+
+	# @dp.message_handler(commands=['Режим_работы'])
+	async def pizza_open_command(message : types.Message):
+    		await message.delete()
+    		await bot.send_message(message.from_user.id,'Режим работы : Вт-Чт с 9:00 до 20:00, Пт-Сб с 10:00 до 23:00')
+
+	# @dp.message_handler(commands=['Расположение'])
+	async def pizza_place_command(message : types.Message):
+    		await message.delete()
+    		await bot.send_message(message.from_user.id,'Адрес : ул.Колбасная 15')
+
+Теперь в файле client записываем ф-ию (register_handlers_client),в которой нужно записать команды для регестрации хэндлеров для нашего бота.И передать с помощью
+этой ф-ии хэндлеры в основной файл.
+В эту ф-ию нужно передать диспэтчер dp,для него нужно написать аннотацию типа(: Dispatcher) т.к это aiogram:
+	def register_handlers_client(dp : Dispatcher):
+
+класс Dispatcher как образец для аннотации нужно импортировать в файл:
+	from aiogram import Dispatcher
+
+В коде ф-ии пишем код обращаясь к диспетчеру dp и у него есть метод .register_message_handler (спец.метод,который регистрирует хэндлер для нашего бота):
+	dp.register_message_handler()
+Внутри пишем имя ф-ии которая относится к какому-либо хэндлеру,далее commands (команды,на которые она реагирует).
+    	dp.register_message_handler(commands_start, commands=['start', 'help'])
+    	dp.register_message_handler(pizza_open_command, commands=['Режим_работы'])
+    	dp.register_message_handler(pizza_place_command, commands=['Расположение'])
+
+Все,регистрация хэндлера записана(получается,вместо декоратора записываем эту конструкцию):
+	def register_handlers_client(dp:Dispatcher):
+    		dp.register_message_handler(commands_start, commands=['start', 'help'])
+    		dp.register_message_handler(pizza_open_command, commands=['Режим_работы'])
+    		dp.register_message_handler(pizza_place_command, commands=['Расположение'])
+Все,этот файл готов!
+
+---Код файла client:
+	from aiogram import types
+	from aiogram import Dispatcher
+	from create_bot import bot,dp
+
+	# @dp.message_handler(commands=['start', 'help'])
+	async def commands_start(message : types.Message):
+	    try:
+        	await bot.send_message(message.from_user.id, 'Приятного аппетита')
+        	await message.delete()
+    	    except:
+        await message.reply('Общение с ботом через ЛС, напишите ему : \nhttps://t.me/cosmetic_menu_bot')
+
+	# @dp.message_handler(commands=['Режим_работы'])
+	async def pizza_open_command(message : types.Message):
+    		await message.delete()
+    		await bot.send_message(message.from_user.id,'Режим работы : Вт-Чт с 9:00 до 20:00, Пт-Сб с 10:00 до 23:00')
+
+	# @dp.message_handler(commands=['Расположение'])
+	async def pizza_place_command(message : types.Message):
+    		await message.delete()
+    		await bot.send_message(message.from_user.id,'Адрес : ул.Колбасная 15')
+
+	def register_handlers_client(dp:Dispatcher):
+    		dp.register_message_handler(commands_start, commands=['start', 'help'])
+    		dp.register_message_handler(pizza_open_command, commands=['Режим_работы'])
+    		dp.register_message_handler(pizza_place_command, commands=['Расположение'])
+-------------------------------------
+
+(3.4) Теперь тоже самое нужно сделать в другом модуле other.
+Копируем туда такую же ф-и но изменяем название(client на other):
+	def register_handlers_other(dp:Dispatcher):
+
+В регистре меняем имя ф-ии на echo_send_mat,т.к у нее тут команд нет,то в скобках убираем команды:
+	dp.register_message_handler(echo_send_mat)
+
+Закомментируем декоратор @dp.message_handler().
+Для аннотациитипа так же нужно импортировать Dispatcher:
+	from aiogram import Dispatcher
+
+Все,файл other готов!
+
+----Код файла other:
+
+	from aiogram import types
+	import string
+	import json
+	from aiogram import Dispatcher
+	from create_bot import dp
+
+	'''----тут у нас был декоратор,который улавливает любые сообщения----'''
+	# @dp.message_handler()                       #декоратор события,что в чат кто-то что-то пишет вообще
+	# async def echo_send(message : types.Message):
+	#     print('обработчик событий запущен')
+	#     await bot.send_message(message.from_user.id, message.text)
+	#     # if message.text == 'привет' or message.text == 'Привет':
+	#     #     print('ответное сообщение на "Привет" отправлено')
+	#     #     await message.answer('И тебе привет')      #отправка ответного сообщение нашим ботом.
+	#     # else:
+	#     #     await message.answer(message.text)
+	'''----------------------------------------------------------------------'''
+
+	# @dp.message_handler()                      	 	                        #общий хендлер(декоратор событий,что в чат кто-то вообще пишет)
+	# async def echo_send(message : types.Message):
+	#     print('обработчик событий запущен(уловил сообщение)')
+	#     await bot.send_message(message.from_user.id, message.text)          #бот высылает пользователю тоже самое сообщение
+	#     if message.text == 'привет' or message.text == 'Привет':
+	#          print('ответное сообщение на "Привет" отправлено')
+	#          await message.answer('И тебе привет')
+	#     # else:
+	#     #      await message.answer(message.text)
+
+	# @dp.message_handler()
+	async def echo_send_mat(message : types.Message):
+    		if {i.lower().translate(str.maketrans('', '', string.punctuation)) for i in message.text.split(' ')}\
+        		.intersection(set(json.load(open("cenz_cosmetiks.json")))) != set():
+        		# await message.reply('maty zapreszeny')
+        		user = message.from_user                                            #получение объекта user,что бы после получить из него имя пользователя
+        		await message.answer(f'{user.first_name}!Маты запрещены!')          #достаем имя пользователя через user.first_name
+        		await message.delete()
+
+	def register_handlers_other(dp:Dispatcher):
+    		dp.register_message_handler(echo_send_mat)
+--------------------------------------------
+	
+(3.5) Тепер в осн.файл bot_telegram_cosmetiks переносим эти ф-ии(register_handlers_other и register_handlers_client).
+Для этого записываем импорт.Записываем явные импорты.Из директории(папки) handlers импортируем модуль client,модуль admin(пока что пустой,но запишем сразу этот
+импорт) и модуль other.
+	from handlers import client, admin, other
+
+И теперь тут просто запускаем эти ф-ии : 
+	из модуля client запускаем ф-ию register_handlers_client,в нее передаем dp(т.к он используется в client(вызываем его метод)):
+		client.register_handlers_client(dp)
+
+	тоже самое делаем с модулем other:
+		other.register_handlers_other(dp)
+Таким образом,этими командами,регистрируем все хэндлеры для нашего бота.
+В папке other есть пустой хендлер dp.message_handler() для регистрации мата,он должен располагаться ниже хэндлеров,в которых есть какие-то команды,поэтому в осн.файле 
+функцию с other импортируем последним.
+
+---Код файла bot_telegram_cosmetiks:
+
+	from aiogram.utils import executor          #из aiogram.utils импортируем executor что бы запустить бота,что бы он вышел в онлайн
+	from create_bot import dp
+
+	from handlers import client, admin, other   #импорт модулей,для запуска функций их хэндлеров
+
+	'''-------логинг ошибок------'''
+	import logging
+	logging.basicConfig(level=logging.INFO)
+	'''-------логинг ошибок------'''
+
+
+	async def on_startup(_):
+	    	print('бот вышел в чат')
+
+	client.register_handlers_client(dp)         #запуск функии с хэндлерами модуля client
+	other.register_handlers_other(dp)           #запуск функии с хэндлерами модуля other
+
+	executor.start_polling(dp, skip_updates=True, on_startup = on_startup)      #команда запуска нажего бота
+
+
+

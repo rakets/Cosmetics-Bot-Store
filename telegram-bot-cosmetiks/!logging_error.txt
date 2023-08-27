@@ -1,0 +1,4 @@
+'''-------логинг ошибок------'''
+import logging
+logging.basicConfig(level=logging.INFO)
+'''-------логинг ошибок------'''

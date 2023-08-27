@@ -1,0 +1,12 @@
+---- обращение бота к пользователю по поводу мата -------
+
+p.s : обращение не просто по имени,а конкретно с указанием пользователя через @
+
+--------------
+
+    if {i.lower().translate(str.maketrans('', '', string.punctuation)) for i in message.text.split(' ')}\
+        .intersection(set(json.load(open("cenz_cosmetiks.json")))) != set():
+        # await message.reply('maty zapreszeny')
+        user = message.from_user                                            #получение объекта user,что бы после получить из него имя пользователя
+        await message.answer(f'@{user.first_name}!Маты запрещены!')          #достаем имя пользователя через user.first_name
+        await message.delete()

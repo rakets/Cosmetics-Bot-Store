@@ -2,10 +2,12 @@ from aiogram import types
 from aiogram import Dispatcher
 from create_bot import bot,dp
 
+from keyboards import kb_client
+
 # @dp.message_handler(commands=['start', 'help'])
 async def commands_start(message : types.Message):
     try:
-        await bot.send_message(message.from_user.id, 'Приятного аппетита')
+        await bot.send_message(message.from_user.id, 'Приятного аппетита', reply_markup= kb_client)
         await message.delete()
     except:
         await message.reply('Общение с ботом через ЛС, напишите ему : \nhttps://t.me/cosmetic_menu_bot')

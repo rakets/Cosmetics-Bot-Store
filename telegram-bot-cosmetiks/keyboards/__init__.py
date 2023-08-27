@@ -1,0 +1,1 @@
+from keyboards.client_kb import kb_client   #из папки-пакета keyboards,файла client_kb импортируем kb_client (переменную,в которой у нас кастомная клавиатура)

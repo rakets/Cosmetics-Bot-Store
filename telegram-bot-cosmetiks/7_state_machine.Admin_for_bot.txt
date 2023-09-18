@@ -70,12 +70,518 @@ aioredis,т.к если во время хранения полученных о
 	class FSMAdmin(StatesGroup)	
 
 В этом классе запишем 4 состояния(в данном случае):
+	т.е у нас будет класс с 4-мя пунктами последовательных вопросов:
 
-----------------------------------------------------------------    ЗАКОНЧИЛИ ТУТ 8.30   --------------------------
+	1)отправка фотографии(т.е подгружаем меню):заводим экземпляр переменную photo и запускаем класс State():
+		photo = State() 
+	это необходимо,что бы обозначить что это будет за состояние бота и потом будем переходить между ними.			
 
-	т.е у нас будет класс с 4-мя пунктами последовательных вопросов.
-	1)отправка фотографии(т.е подгружаем меню): заводим переменную photo и запускаем класс State(). 
 	2)название пиццы: заводим переменную name и запускаем класс State()
+		name = State()	
+	
 	3)описание пиццы: заводим переменную description и запускаем класс State()
+		description = State()
+
 	4)цена: заводим переменную price и запускаем класс State()
+		price = State()
+
+Класс State() необходим,что бы обозначить,что это будет конкретно состояние и далее мы будем переходить между ними.
+Нужен,что бы можно было переходить между состояниями(переход пропишем в хэндлерах).
+
+----Весь класс FSMAdmin():
+
+	class FSMAdmin(StatesGroup):
+   		photo = State()
+    		name = State()
+    		descrition = State()
+    		price = State()
+
+-----------------
+Запишем базовый хэндлер,который запускает нашу машину состояний(для начала диалога,загрузки нового пункта меню).
+Записываем message_handler,пишем параметр commands и команду(Загрузить),для нее позже сделаем вывод кнопки,что бы 
+админу было удобно,указываем параметр state(состояние) и записываем None,т.к это хендлер старта и бот не находится
+в состоянии 'машины состояний'.
+	dp.message_handler(commands='Загрузить',state=None)
+
+Далее пишем ассинхронную ф-ию,имя которое нам понравится и аннотацию типа:
+	async def hand_start(message : types.Message):	
+
+так же нужно из aiogram импортировать types
+	from aiogram import types
+
+Далее нужно указать следующую команду(через оператор await запускаем класс FSMAdmin и запускаем метод(обращаемся по имени photo
+и .set()))
+	await FSMAdmin.photo.set()
+,далее еще один оператор await и message.reply и в скобках ответное сообщение
+	await message.reply('Загрузи фото')
+
+Действует это так:админ пишет /Загрузить,то срабатывает этот хэндлер,мы становимся ботом в состояние загрузки(он будет ожидать
+ответа от пользоваетля(бот перейдет из обычного режима работы,в режим 'машина состояний',благодаря тому,что мы устанавливаем
+переход await FSMAdmin.photo.set() для бота перейти в режим await message.reply('Загрузи фото').
+
+---весь первый хендлер:
+	#Начало диалога(загрузка нового пунката меню)
+	dp.message_handler(commands='Загрузить',state=None)
+	async def hand_start(message : types.Message):
+    	await FSMAdmin.photo.set()
+    	await message.reply('Загрузи фото')
+
+Далее нужно указать хендлер,который поймает ответ от пользователя.
+Так же пишем обычный message_handler, в данном случае указываем content_types=['photo'],т.к будем отправлять картинку, и в пар-р
+state записываем FSMAdmin.photo,т.к в предыдущем хэндлере,строкой await FSMAdmin.photo.set(),поставили бота в состояние ожидания
+ответа на первый вопрос.Благодаря тому,что в state передаем FSMAdmin.photo,бот понимает,что именно в этот хэндлер попадет первый
+ответ от пользователя.
+	dp.message_handler(content_types=['photo'],state=FSMAdmin.photo)
+
+Далее записываем ассинхронную ф-ию async def любое имя(load_photo),далее в агрумент message указываем пар-р
+с аннотацией :types.Message,аргумент state указываем с пар-м с аннотацией : FSMContext(для этого мы его и импортировали).
+	async def load_photo(message :types.Message, state: FSMContext):
+
+Далее,т.к это декоратор(хэндлер) сработает на отправку фото,необходимо сохранить полученный результат в словарь машины состояний.Для этого
+есть 3 варианта написания.
+	Вариант с контекстным менеджером with самый оптимальный,записываем через async with,открываем state.proxy() as data:
+		async with state.proxy() as data:
+
+т.е это словарь,в который мы записываем  по ключу photo значение message.photo[0].file_id
+		data['photo'] = message.photo[0].file_id
+
+всю картинку в базу данных записывать не будем,т.к у телеграма есть штука,что к каждому отправленному файлу присваивается уникальный id-номер,
+который запишем в базу данных и бот,отправляя картинку,будет отправлять картинку по этому id.Т.е мы из сообщения(message),фото 
+по индексу 0 (photo[0]),получаем id этого изображения (file_id) и пишем в словарь машины состояний.
+
+Далее т.к на первый вопрос пользователь ответил,через оператор await обращаемся FSMAdmin и используем метод .next()(т.е переводим нашего
+бота в ожидание след.ответа).
+	await FSMAdmin.next()
+
+Далее записываем ему сообщение await message.reply('Теперь введи название').
+	await message.reply('Теперь введи название')
+
+---Весь хендлер,который ловит первый ответ:
+	#Хендлер,который ловит первое сообщение
+	dp.message_handler(content_types=['photo'],state=FSMAdmin.photo)
+	async def load_photo(message :types.Message, state: FSMContext):
+    		async with state.proxy() as data:
+        			data['photo'] = message.photo[0].file_id
+        	await FSMAdmin.next()
+        	await message.reply('Теперь введи название')
+
+Далее нужно записать хэндлер,что бы поймать следующий ответ пользователя,на поставленный ранее вопрос.
+Т.к в предыдущем хэндлере мы перевели бода в состояние ожидание след.ответа т.е мы указали FSMAdmin.next(),то бот находится в состоянии name.
+То во втором хэндлере записываем состояние state=FSMAdmin.name(указывая,что сюда будет попадать второй ответ).
+Далее пишем асинхронную ф-ию,в аргументах точно так же(аннотации к типу message и state).
+	async def load_name(message: types.Message, state: FSMContext):
+Далее открываем словарь хранения информации как data.И записываем под ключем name,вытягивая из события сообщения(message) текст (text)
+(т.е в данный момент админ введет название для пиццы).
+	async with state.proxy() as data:
+        	data['name'] = message.text
+Поймав и записав второй ответ в словарь временного хранилища,далее переводим бота в ожидание отвена на следующее состояние await FSMAdmin.next()
+(т.е переходит в состояние description = State(),в котором админ будет вводить описание пиццы).
+Далее задаем ему вопрос await message.reply('Введи описание')
+
+----Весь хендлер,который ловит второй ответ:
+	#Хендлер,который ловит второе сообщение(название)
+	dp.message_handler(state=FSMAdmin.name)
+	async def load_name(message: types.Message, state: FSMContext):
+       		async with state.proxy() as data:
+            		data['name'] = message.text
+        	await FSMAdmin.next()
+        	await message.reply('Введи описание')
+
+Далее пишем следующий хэндлера,что бы поймать ответ с описанием пиццы.
+Указываем состояние state=FSMAdmin.description,далее асинхр.ф-ию,имя,аннотации типов.Далее опять лезем в словарь,записываем message.text(то,что отправит админ) 
+по ключу description.Далее переводим бота в след.состояние await FSMAdmin.nex(),в котором админ будет уже вводить цену.И пишем ему сообщение(await message.reply('Теперь укажи цену'))
+
+----Весь хендлер,который ловит третий ответ:
+	#Хендлер,который ловит третье сообщение(описание)
+	dp.message_handler(state=FSMAdmin.description)
+	async def load_description(message: types.Message, state: FSMContext):
+        	async with state.proxy() as data:
+            		data['description'] = message.text
+        	await FSMAdmin.next()
+        	await message.reply('Введи цену')
+
+Далее пишем хэндлер,что бы поймать четвертый ответ(с ценой).
+Теперь в хэндлере нашего последнего состояния так же указываем состояние state = FSMAdmin.price,далее асинхр.ф-ия с аннотациями типов.Обращаемся к словарю
+через переменную data.И по ключу price записываем текст,который введет админ.(через float переведем в число с плавающей точкой).
+	async with state.proxy() as data:
+        	data['price'] = float(message.text)
+Далее,что бы завершить состояния,нужно указать await state.finish() (как только записана эта команда,бот выходит из машины состояний и очищает все то,что мы
+записали,т.е полностью очищается словарь и бот выходит из машины состояний,поэтому все то,что мы ходим сделать с этими данными нужно сделать до этой команды).
+
+Тут есть несколько вариантов что можно сделать,но т.к мы еще не делали базу данных,то выведем нашим ботом,то что мы получили в чат.Открываем все это дело как data
+(async with state.proxy() as data).Далее оператор await, тут message.reply() и передаем сюда наш словарь.Т.к это словарь-нам необходима строка,поэтому напишем
+конвертацию str,выведем словарь data.
+        async with state.proxy() as data:
+            await message.reply(str(data))
+
+----Весь хендлер,который ловит четвертый(последний) ответ:
+	#Хендлер,который ловит четвертое сообщение(цену)
+	dp.message_handler(state=FSMAdmin.price)
+	async def load_price(message: types.Message, state: FSMContext):
+        	async with state.proxy() as data:
+            		data['price'] = float(message.text)  
+        	async with state.proxy() as data:
+            		await message.reply(str(data))
+        	await state.finish()
+
+------------------------------------------
+Сейчас мы писали код как-будто бота находится в одном файле.
+Т.к бот разбит по разным модулям,то эти хэндлеры нужно импортировать в основной файл (bot_telegram.py) и зарегать как прочие наши хэндлеры.
+
+Нужно определить функцию,в которой зарегестируем эти хендлеры и отправить их в наш основной файл.
+Регистрируем хендлеры точно так же как регистрировали в файле client и комментируем хендлеры:
+	#Регистрация хендлеров
+		def register_admin(dp: Dispatcher):
+    		dp.register_message_handler(dl_start, commands=['Загрузить'], state=None)
+    		dp.register_message_handler(load_photo, commands=['photo'], state=FSMAdmin.photo)
+    		dp.register_message_handler(load_name, state=FSMAdmin.name)
+    		dp.register_message_handler(load_description, state=FSMAdmin.description)
+    		dp.register_message_handler(load_price, state=FSMAdmin.price)
+
+Так же нужно импортировать диспетчер,т.к используется dp(диспетчер)
+	from create_bot import dp
+и Dispatcher для аннотации типа (т.к используется при регистрации хендлеров)
+	from aiogram import Dispatcher
+
+---Код файла admin:
+
+from aiogram.dispatcher import FSMContext  # для аннотации типа
+
+from aiogram.dispatcher.filters.state import State, StatesGroup
+
+from aiogram import types
+
+from aiogram import Dispatcher  # импорт диспетчера для аннотации типа
+
+from create_bot import dp  #импорт экземпляра диспетчера
+
+
+class FSMAdmin(StatesGroup):
+    photo = State()
+    name = State()
+    description = State()
+    price = State()
+
+
+# Начало диалога(загрузка нового пунката меню)
+# dp.message_handler(commands='Загрузить',state=None)
+async def dl_start(message: types.Message):
+    await FSMAdmin.photo.set()
+    print('пользователь получил сообщение /Загрузить')
+    await message.reply('Загрузи фото')
+
+
+# Хендлер,который ловит первое сообщение(фото)
+# dp.message_handler(content_types=['photo'],state=FSMAdmin.photo)
+async def load_photo(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['photo'] = message.photo[0].file_id
+    print('фото загрузили')
+    await FSMAdmin.next()  # хендлер переведен в состояние ожидания след.ответа
+    print('бот перешел в новый хендлер')
+    await message.reply('Теперь введи название')  # бот отправляет фразу,для получения ответа
+
+
+# Хендлер,который ловит второе сообщение(название)
+# dp.message_handler(state=FSMAdmin.name)
+async def load_name(message: types.Message, state: FSMContext):
+    print('Пользователь ввел имя')
+    async with state.proxy() as data:
+        data['name'] = message.text
+    await FSMAdmin.next()
+    await message.reply('Введи описание')
+
+# Хендлер,который ловит третье сообщение(описание)
+# dp.message_handler(state=FSMAdmin.description)
+async def load_description(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['description'] = message.text
+    await FSMAdmin.next()
+    await message.reply('Введи цену')
+
+
+# Хендлер,который ловит четвертое сообщение(цену)
+# dp.message_handler(state=FSMAdmin.price)
+async def load_price(message: types.Message, state: FSMContext):
+    async with state.proxy() as data:
+        data['price'] = float(message.text)
+    async with state.proxy() as data:
+        await message.reply(str(data))
+    await state.finish()
+
+
+# Регистрация хендлеров
+def register_handlers_admin(dp: Dispatcher):
+    dp.register_message_handler(dl_start, commands=['Загрузить'], state=None)
+    dp.register_message_handler(load_photo, content_types=['photo'], state=FSMAdmin.photo)
+    dp.register_message_handler(load_name, state=FSMAdmin.name)
+    dp.register_message_handler(load_description, state=FSMAdmin.description)
+    dp.register_message_handler(load_price, state=FSMAdmin.price)
+
+------------------------------
+переходим в основной файл bot_telegram.py(точку входа).
+Мы уже сюда импортировали модуль admin.
+	from handlers import client, admin, other
+
+Поэтому дописываем после регистрации client и other (admin,далее имя ф-ии register_handlers_admin,туда передаем диспэтчер dp)
+	admin.register_handlers_admin(dp)           #запуск функии с хэндлерами модуля admin
+
+И еще такой момент: у нас есть пустой хэндлер other (other.register_handlers_other(dp)) и нам необходимо,
+что бы его регистрация была последняя(т.е мы его ставит в конец),а то что написали(admin.register_handlers_admin(dp))
+подымаем выше.
+	client.register_handlers_client(dp)         #запуск функии с хэндлерами модуля client
+	admin.register_handlers_admin(dp)           #запуск функии с хэндлерами модуля admin
+	other.register_handlers_other(dp)           #запуск функии с хэндлерами модуля other
+
+Отправим команду /загрузить,после этого бот устанавливается в состояние машины состояний(конкретно photo)приходит ответ
+'Загрузи фото' и когда мы загрузим фото,сработает следующий хэндлер,который возьмет id фото и переведет бота в следующее
+состояние и т.д.
+В итоге нам приходит сообщение,в котором содержится что-то типа:
+
+FSMContextProxy state = 'FSMAdmin:price', data = {'photo': 'AgACAgIAAxkBAAIBv2RQ4FZkjCUoJsG5DXsUtX45iwGlAAKFzTEbakmBSuybYRlZWHFQAQADAgADcwADLwQ',
+ 'name': 'фывфыв', 'description': 'ваываытващытващаытв заоываоы', 'price': 23.0} 
+
+и это мы долшли до строчки кода админа     
+async with state.proxy() as data:
+	await message.reply(str(data))
+
+у нас есть словарь,где по ключу photo лежит id (далее его будем писать в бд,что бы бот мог отправлять пользователям),далее ключ name,со значением,
+ключ description и ключ price.
+Машина состояний работает!!!!
+
+В любой машине состояний должна быть кнопка ОТМЕНЫ,т.е если пользователь передумал вводить и что-бы вывести бота из состояния Машины состояний.
+Напишем данный хендлер.
+Он декорируется двумя хендлерами,для того,что пользователь может написать например команду "/отмена" или просто написать "отмена".
+Первый декоратор:тут указывается состояние state и * в двойных ковычках(обозначает любое состояние,т.е в каком бы из состояний бот не находился) и
+команда commands "отмена".
+	#Хендлер ОТМЕНЫ
+	dp.message_handler(commands='отмена', state="*")
+
+Второй декорирующий хендлер:здесь у нас фильтр текста(Text),т.е тут записывается equals(какой именно текст),сам текст 'отмена',далее ignore_case=True
+(т.е как бы не написал) и состояние state любое,как и в предыдущем.
+	#Хендлер ОТМЕНЫ
+	dp.message_handler(commands='отмена', state="*")
+	dp.message_handler(Text(equals='отмена', ignore_case=True), state="*")
+
+
+Далее пишем ассинхронную ф-ию async,тут так же как и во всех хендлерах передаем message: types.Message и state: FSMContext .
+	async def cancel_handler(message: types.Message, state: FSMContext):
+
+Далее проверяем в каком состоянии находится бот current_state = await state.get_state() . 
+    	current_state = await state.get_state()
+
+Получаем это состояние в переменную current_state и проверяем, если состояние никакое (None)
+	if current_state is None:
+
+(бот не находится,не работает машина состояний),соответственно то,что введется Отмена или еще что-либо просто не сработает и мы делаем return None.
+	if current_state is None:
+        	return None
+
+Если же бот находится в каком-либо состоянии,то запускается строка await state.finish() (т.е закрываем машину состояний).
+	current_state = await state.get_state()
+    	if current_state is None:
+        	return None
+    	await state.finish()
+
+Далее следующая строка выводит какое-то сообщение.
+	current_state = await state.get_state()
+	if current_state is None:
+        	return None
+    	await state.finish()
+    	await message.reply('Ok')
+
+--------Весь хендлер Отмены:
+	#Хендлер ОТМЕНЫ
+	dp.message_handler(commands='отмена', state="*")
+	dp.message_handler(Text(equals='отмена', ignore_case=True), state="*")
+	async def cancel_handler(message: types.Message, state: FSMContext):
+    		current_state = await state.get_state()                             #получение состояние get_state бота
+    		if current_state is None:                                           #проверка состояния на None
+        		return None
+    		await state.finish()                                                #закрываем машину состояний,если бот не пустой
+    		await message.reply('Ok')                                           #вывод сообщения от бота
+
+Теперь,т.к мы регистрируем наши хендлеры,нам нужно записать две регистрации для каждого из хендлеров по отдельности в ф-ию def register_handlers_admin
+И убираем их из декораторов(комментируем).
+	    dp.register_message_handler(cancel_handler, commands='отмена', state="*")
+    	    dp.register_message_handler(cancel_handler, Text(equals='отмена', ignore_case=True), state="*")
+
+Для корректной работы это все нужно разместить после хендлера с ф-ей Загрузить(@dp.message_handler(commands='Загрузить',state=None)
+),т.к он будет некорректно реагировать.
+	# Начало диалога(загрузка нового пунката меню)
+	# dp.message_handler(commands='Загрузить',state=None)
+	async def dl_start(message: types.Message):
+    		await FSMAdmin.photo.set()
+    		print('пользователь получил сообщение /Загрузить')
+    		await message.reply('Загрузи фото')
+
+	#Хендлер ОТМЕНЫ
+	# dp.message_handler(commands='отмена', state="*")
+	# dp.message_handler(Text(equals='отмена', ignore_case=True), state="*")
+	async def cancel_handler(message: types.Message, state: FSMContext):
+    		current_state = await state.get_state()                             #получение состояние get_state бота
+    		if current_state is None:                                           #проверка состояния на None
+        		return None
+    		await state.finish()                                                #закрываем машину состояний,если бот не пустой
+    		await message.reply('Ok')                                           #вывод сообщения от бота
+
+И тоже самое сделать в ф-ии регистрации хендлеров(разместить после хендлера с ф-ие Загрузить).
+	# Регистрация хендлеров
+	def register_handlers_admin(dp: Dispatcher):
+    		dp.register_message_handler(dl_start, commands=['Загрузить'], state=None)
+    		dp.register_message_handler(cancel_handler, commands='отмена', state="*")
+    		dp.register_message_handler(cancel_handler, Text(equals='отмена', ignore_case=True), state="*")
+    		dp.register_message_handler(load_photo, content_types=['photo'], state=FSMAdmin.photo)
+    		dp.register_message_handler(load_name, state=FSMAdmin.name)
+    		dp.register_message_handler(load_description, state=FSMAdmin.description)
+    		dp.register_message_handler(load_price, state=FSMAdmin.price)
+
+Так же нужно импортировать класс Text,т.к здесь используется фильтр текста.Импортируем из aiogram.dispatcher.filters
+	from aiogram.dispatcher.filters import Text
+
+!!!!!!!!!!!!           ОТМЕНА РАБОТАЕТ         !!!!!!!
+_____________________________________
+ПРОВЕРКА НА АДМИНИСТРАТОРА
+Т.к мы пишем админку,то доступ ко всем этим кнопкам и хендлерам должен быть только у администратора.
+Пока что получается,что любой,кто общается с ботом,может это делать.
+Сделаем проверку на администратора.Это можно делать при помощи разных фильтров,но можно сделать при помощи метода(когда бот не самостоятельно работает,а он
+дополнительно добавлен к группе,т.е он администрирует группу.Т.е можно просто проверить,является ли пользователь администратором в этой группе).Что бы не привязывать 
+жестко по id доступ к хендлерам,будем использовать этот метод.
+
+Пишем этот хендлер перед хендлером Загрузить(после определения классов).
+
+Что бы проверить является ли пользователь модератором группы,а соответственно и бота,нам нужен хендлер получения id текущего модератора.
+В самом декораторе message_handler,пишем команду,которая будет его активировать и записываем стандартный фильтр is_chat_admin,в котором ставим булевое значение True(т.е
+если это админ,то состояние True)
+	#Проверка является ли пользовательл админом
+	dp.message_handler(commands=['moderator'], is_chat_admin=True)
+
+Далее в самом начале после импортов нужно определить константу переменную ID,в которой изначально будет значение None.
+	ID = None
+
+Как только пользователь вводит команду moderator и он у нас является модератором группы,то мы обьявляем переменнуб ID глобальной 
+	#Проверка является ли пользовательл админом
+	dp.message_handler(commands=['moderator'], is_chat_admin=True)
+	async def make_change_commands(message: types.Message):
+    		global ID
+
+и присваиваем в нее id этого пользователя(администратора).
+	#Проверка является ли пользовательл админом
+	dp.message_handler(commands=['moderator'], is_chat_admin=True)
+	async def make_change_commands(message: types.Message):
+    		global ID
+    		ID = message.from_user.id
+
+!!!Администратор должен написать не лично боту,а в группу,что бы бот взял id и проверил его на прова доступа!!!Далее ботом пишем ему в личку 'Что хозяин надо' и отправляем клавиатуру админа
+(reply_markup=button_case_admin).И удаляем это сообщение из нашего группового чата.
+	async def make_changes_command(message: types.Message):
+    		global ID
+    		ID = message.from_user.id
+    		await bot.send_message(message.from_user.id, " Что хозяин надо??? ", reply_markup = admin_kb.button_case_admin)
+    		await message.delete()
+
+Так же,т.к используется экземпляр бота,то его нужно импортировать из create_bot.
+	from create_bot import bot
+
+Далее так же регистрируем этот хендлер в регистраторе.
+	#Проверка является ли пользовательл админом
+    	dp.register_message_handler(make_changes_command, commands=['moderator'], is_chat_admin=True)
+
+---Весь хендлер проверки модератора---
+	# Получаем id текущего модератора
+	# @dp.message_handler(commands=['moderator'], is_chat_admin=True)
+	async def make_changes_command(message: types.Message):
+    		global ID
+    		ID = message.from_user.id
+    		await bot.send_message(message.from_user.id, " Что хозяин надо??? ", reply_markup = admin_kb.button_case_admin)
+    		await message.delete()
+
+!!!Далее во всех хендлерах(в которых должен быть доступ только у админа) устанавливаем такую проверку if message.from_user.id == ID: !!!
+     
+     ---в хендлере 'загрузить'
+	# @dp.message_handler(commands='Загрузить',state=None)
+	async def cm_start(message: types.Message):
+    		if message.from_user.id == ID:
+        		await FSMAdmin.photo.set()
+        		await message.reply('Загрузи фото')
+
+     ---в хендлере 'отмена'
+	# @dp.message_handler(state="*", commands='отмена')
+	# @dp.message_handler(Text(equals='отмена', ignore_case=True), state="*")
+
+	async def cancel_handler(message: types.Message, state: FSMContext):
+    		if message.from_user.id == ID:
+        		current_state = await state.get_state()
+        		if current_state is None:
+            			return
+        		await state.finish()
+        		await message.reply('ОК')
+
+     ---в хендлере первого сообщения 'имя' после 'загрузить фото'
+	# @dp.message_handler(content_types=['photo'],state=FSMAdmin.photo)
+	async def load_photo(message: types.Message, state: FSMContext):
+    		if message.from_user.id == ID:
+        		async with state.proxy() as data:
+            			data['photo'] = message.photo[0].file_id
+        		await FSMAdmin.next()
+        		await message.reply('Теперь введи название')
+     
+     ---в хендлере второго сообщения 'описание' после 'имя'
+	# @dp.message_handler(state=FSMAdmin.name)
+	async def load_name(message: types.Message, state: FSMContext):
+    		if message.from_user.id == ID:
+        		async with state.proxy() as data:
+            			data['name'] = message.text
+        	await FSMAdmin.next()
+        	await message.reply('Введи описание')
+
+     ---в хендлере третьего сообщения 'цена' после 'описания'
+	# @dp.message_handler(state=FSMAdmin.description)
+	async def load_description(message: types.Message, state: FSMContext):
+    		if message.from_user.id == ID:
+        		async with state.proxy() as data:
+            			data['description'] = message.text
+        	await FSMAdmin.next()
+        	await message.reply('Теперь укажи цену')
+
+     ---в хендлере,который ловит последний ответ с ценой от пользователя
+	# dp.message_handler(state=FSMAdmin.price)
+	async def load_price(message: types.Message, state: FSMContext):
+    		if message.from_user.id == ID:
+        		async with state.proxy() as data:
+            		data['price'] = float(message.text)
+        	async with state.proxy() as data:
+            		await message.reply(str(data))
+        	await state.finish()
+
+Теперь все хендлеры машины состояний работают только когда пользователь прошел проверку.
+
+---Регистрация всех хендлеров в admin.py:
+	# Регистрация хендлеров
+	def register_handlers_admin(dp: Dispatcher):
+    	dp.register_message_handler(dl_start, commands=['Загрузить'], state=None)
+
+	# 2 хендлера отмены
+    	dp.register_message_handler(cancel_handler, commands='отмена', state="*")
+    	dp.register_message_handler(cancel_handler, Text(equals='отмена', ignore_case=True), state="*")
+
+    	dp.register_message_handler(load_photo, content_types=['photo'], state=FSMAdmin.photo)
+    	dp.register_message_handler(load_name, state=FSMAdmin.name)
+    	dp.register_message_handler(load_description, state=FSMAdmin.description)
+    	dp.register_message_handler(load_price, state=FSMAdmin.price)
+
+	#Проверка является ли пользователь админом
+    	dp.register_message_handler(make_change_commands, commands=['moderator'], is_chat_admin=True)
+
+____________________
+Уточнение: 
+	1)метод обращения к словарю с помощью оператора контекста with (async with state.proxy() as data:) самый оптимальный и безопасный.Есть еще два метода-загуглить.
+	2)т.к data - это словарь,то к нему можно обращаться не только по ключам,но и методами словарей.Методы словарей чаще всего не вызывают ошибки,если что-то не так(или ключа нет,или еще что-то).
+	можно прописать исключение,что эту ошибку пропустить,т.к у методов в словаре есть такие штуки.Но можно обращаться напрямую синтаксисом data['price'] = float(message.text) так можно определять
+	ошибки(если ключа нет,то будет исключение-просто будет исключение и мы это сразу увидим)	
+
+
+
+	
+
 	

@@ -22,7 +22,7 @@ async def pizza_place_command(message : types.Message):
     await message.delete()
     await bot.send_message(message.from_user.id,'Адрес : ул.Колбасная 15')
 
-def register_handlers_client(dp:Dispatcher):
+def register_handlers_client(dp: Dispatcher):
     dp.register_message_handler(commands_start, commands=['start', 'help'])
     dp.register_message_handler(pizza_open_command, commands=['Режим_работы'])
     dp.register_message_handler(pizza_place_command, commands=['Расположение'])

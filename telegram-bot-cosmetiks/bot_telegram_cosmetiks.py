@@ -1,7 +1,8 @@
 from aiogram.utils import executor          #из aiogram.utils импортируем executor что бы запустить бота,что бы он вышел в онлайн
+
 from create_bot import dp
 
-from handlers import client, admin, other   #импорт модулей,для запуска функций их хэндлеров
+from handlers import client, other, admin   #импорт модулей,для запуска функций их хэндлеров
 
 '''-------логинг ошибок------'''
 import logging
@@ -13,6 +14,7 @@ async def on_startup(_):
     print('бот вышел в чат')
 
 client.register_handlers_client(dp)         #запуск функии с хэндлерами модуля client
+admin.register_handlers_admin(dp)           #запуск функии с хэндлерами модуля admin
 other.register_handlers_other(dp)           #запуск функии с хэндлерами модуля other
 
 executor.start_polling(dp, skip_updates=True, on_startup = on_startup)      #команда запуска нажего бота

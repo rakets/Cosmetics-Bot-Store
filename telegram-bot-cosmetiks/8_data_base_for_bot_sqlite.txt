@@ -1,0 +1,283 @@
+У нас написана админка с машиной состояний,что бы администратор мог подгружать в базу данных меню
+для пиццерии.После того как админ введет все необходимые данные,в последнем хендлере,в котором у 
+нас finish() мы просто выводили в телеграм сообщением словарь машины состояний.Теперь мы отправим 
+все это в базу данных.И сделаем так,что бы клиенту после нажатия на кнопку 'меню',выгружалось меню,
+которое задал админ.
+__________________________
+В основной директории создаем еще одну папку data_base,в нее кидает файл __init__.py ,в который
+from data_base(т.е отталкиваясь от этой директории) импортируем модуль,который мы называем sqlite_db
+(или как вам понравится)
+	
+	from data_base import sqlite_db
+
+Далее в папке data_base создаем файл sqlite_db.py,который только что импортировали в __init__.py 
+_________________________
+В файле sqlite_db.py 
+Т.к бот ассинхронный,то он использует один поток исполнения,соответственно нам сюда подойдет любая 
+база данных.Берем базу sqlite.В питоне есть модуль sqlite3 для работы с этой базой данных.
+Это встроенная база данных,она работает прямо в приложении,для нее не нужен никакой сервер,т.к она
+исполнена в виде одного файла.
+
+	import sqlite3 as sq
+
+Определяем ф-ию sql_start,в которой пишем создание самой бд или подключение(если она уже создана).
+
+	def sql_start():	
+
+Создаем переменную base
+Модуль sqlite3 мы уже импортировали(его дополнително скачивать не нужно,это встроенный в пайтон модуль)
+Далее записываем метод connect,он позволяет подключиться к файлу cosmetics_cool.db базы данных.Если такого
+файла не будет,то он создастся.Если он будет,то просто произойдет подключение к нему.
+	
+	def sql_start():
+		global base
+    		base = sq.connect('cosmetics_cool.db') 
+
+Курсор это именно та часть бд,которая осуществляет встраивание,поиск и выборку данных из бд.
+Cоздаем переменную cur,она отталкивается от созданного экземпляра коннекта,т.е у нас подключение к 
+базе данных base точка cursor.
+
+	def sql_start():
+    		global base, cur
+    		base = sq.connect('cosmetics_cool.db')
+    		cur = base.cursor()
+
+Далее сделаем,что бы когда бот подключается  к базе данных,он выводил в терминал "Data base connected OK!".
+Т.е к бд произошло нормальное подключение.
+
+	def sql_start():
+    		global base, cur
+    		base = sq.connect('cosmetics_cool.db')
+    		cur = base.cursor()
+    		if base:
+        		print('Data base connected!')
+
+Записываем команду base.execute (созадаем таблицу,в которую будем вносить данные) CREATE TABLE IF NOT EXISTS
+значит 'создать таблицу,если такой не существует'.
+menu(img TEXT, name TEXT PRIMARY KEY, description TEXT, price TEXT) значит,что будет таблица menu,в которой
+будет 4 столбца(кортинка,название,описание,цена).TEXT написано,т.к если смотреть в админку,то когда мы отправляем
+картинку,то бот присваивает ей id,через который потом может ее отправлять(data['photo'] = message.photo[0].file_id).
+PRIMARY KEY - первичный ключ,т.е повторяться название не будет.
+сохраняем эти изменения через base.commit()
+
+	def sql_start():
+    		global base, cur
+    		base = sq.connect('cosmetics_cool.db')
+    		cur = base.cursor()
+    		if base:
+        		print('Data base connected!')
+        		base.execute('CREATE TABLE IF NOT EXISTS menu(img TEXT, name TEXT PRIMARY KEY, description TEXT, price TEXT)')
+        		base.commit()
+
+Создаем ф-ию sql_add_command,в которой будем записывать изменения в бд(к ней вернемся позже).
+
+	async def sql_add_command(state):
+    		async with state.proxy() as data:
+        		cur.execute('INSERT INTO menu VALUES (?, ?, ?, ?)',tuple(data.values()))
+        		base.commit()
+
+Сначала нам нужно прописать запуск фукции sql_start,для этого переходим в основной файл bot_telegram_cosmetiks
+------
+Но для начала необходимо запустить код(прописать запуск ф-ии sql_start() ).В основном файле telegram-bot_cosmetiks (файл в котором запускается
+старт поллинга executor.start_polling(dp, skip_updates=True, on_startup = on_startup) ) у нас есть ф-ия on_startup,код которой исполняется во 
+время старта поллинга.В это ф-ии мы будем запускать ф-ию старта базы данных.
+
+Для начала в файл bot_telegram_cosmetiks нужно импортировать модуль sqlite_db из пакета data_base
+
+	from data_base import sqlite_db             #импорт модуля sqlite_db из пакета data_base
+
+В коде ф-ии on_startup записываем запуск ф-ии sql_start
+	
+	sqlite_db.sql_start()
+
+	вся ф-ия
+		
+		async def on_startup(_):
+    			print('бот вышел в чат')
+    			sqlite_db.sql_start()                   #запуск ф-ии записи бд
+--------
+Далее в файле админа нужно убрать 2 строчки,которые выводили сообщения с бд в сообщение чата.
+	
+	# Хендлер,который ловит четвертое сообщение(цену)
+	# dp.message_handler(state=FSMAdmin.price)
+	async def load_price(message: types.Message, state: FSMContext):
+    		if message.from_user.id == ID:
+        		async with state.proxy() as data:
+            			data['price'] = float(message.text)
+        		async with state.proxy() as data:                         -первая
+            			await message.reply(str(data))                    -вторая
+        		await state.finish()
+
+на их место нужно записать запуск ф-ии sql_add_command из файла sqlite_db
+
+Ф-ия sql_add_command ассинхронная(поэтому в файле admin ее запуск будем записывать await sqlite_db.sql_add_command(state) через await)
+к ней в скобки передаем state (полученный словарь(комплексный объект машин состояний))
+
+	await sqlite_db.sql_add_command(state)     #запуск ф-ии sql_add_command из модуля sqlite_db
+
+весь хендлер после замены 2х строк:
+
+	# Хендлер,который ловит четвертое сообщение(цену)
+	# dp.message_handler(state=FSMAdmin.price)
+	async def load_price(message: types.Message, state: FSMContext):
+    		if message.from_user.id == ID:
+        		async with state.proxy() as data:
+            			data['price'] = float(message.text)
+        		
+			await sqlite_db.sql_add_command(state)     #запуск ф-ии sql_add_command из модуля sqlite_db
+
+        		await state.finish()	
+
+	async def sql_add_command(state):
+
+Так же в файл admin нужно импортировать модуль с sqlite_db 
+
+	from data_base import sqlite_db 
+
+Теперь когда машина состояний дойдет до завершения,данные отправятся в базу данных и потом машина состояний будет завершена.
+------------------
+Возвращаемся в модуль sqlite_db
+Разберем вторую ф-ию sql_add_command:
+
+	async def sql_add_command(state):
+    		async with state.proxy() as data:
+        		cur.execute('INSERT INTO menu VALUES (?, ?, ?, ?)',tuple(data.values()))
+        		base.commit()
+
+Это ассинхронная ф-ия,именно поэтому в файле admin записывали ее запуск через await
+	await sqlite_db.sql_add_command(state)
+
+В ней как пар-р записан словарь state
+
+асинхронно запускаем менеджер контекста with (async with),далее state.proxy() as data (т.е открываем это словарь state )
+	async def sql_add_command(state):
+    		async with state.proxy() as data:
+
+и теперь используя курсэр cur,команду execute (исполнить) вставляем в таблицу menu значения VALUES,подставляем их безопасно (?, ?, ?, ?) 
+и подставляем значения data.values(),которые нужно перевести в картеж tuple(Просто такой синтаксис sqlite).
+	async def sql_add_command(state):
+    		async with state.proxy() as data:
+        		cur.execute('INSERT INTO menu VALUES (?, ?, ?, ?)',tuple(data.values()))
+
+И сохраняем с помощью commit() эти изменения.
+	async def sql_add_command(state):
+    		async with state.proxy() as data:
+        		cur.execute('INSERT INTO menu VALUES (?, ?, ?, ?)',tuple(data.values()))
+		        base.commit()
+
+!!! Посмотреть видео про sqlite !!! 
+ __________________________
+Добавим администратору 2 кнопки(загрузить и удалить).
+Заходим в папку keyboards и создаем файл(admin_kb.py),где будут кнопки админа.
+
+Создаем две кнопки через KeyboardButton().
+Импортируем класс KeyboardButton
+	from aiogram.types import KeyboardButton
+
+Добавляем две кнопки с помощью класса KeyboardButton и пишем те строки(команды),которые
+нам необходимы. 
+	b1 = KeyboardButton('/Удалить')
+	b2 = KeyboardButton('/Загрузить')
+
+Далее создаем еще переменную button_case_admin и запускаем класс ReplyKeyboardMarkup(замещает обычную клавиатуру,на ту,которую создаем).
+	button_case_admin = ReplyKeyboardMarkup(resize_keyboard=True)    #замена стандартной клавиатуры на созданную
+
+До этого так же нужно импортировать класс ReplyKeyboardMarkup
+	from aiogram.types import ReplyKeyboardMarkup,KeyboardButton
+
+Далее методом .add добавляем кнопки.Метод .add добавляет кнопку каждый раз с новой строки.
+	button_case_admin.add(b1).add(b2)
+
+----весь код admin_kb:
+	from aiogram.types import ReplyKeyboardMarkup,KeyboardButton
+
+	b1 = KeyboardButton('/Удалить')
+	b2 = KeyboardButton('/Загрузить')
+
+	button_case_admin = ReplyKeyboardMarkup(resize_keyboard=True)    #замена стандартной клавиатуры на созданную
+
+	button_case_admin.add(b1).add(b2)
+
+Переходим в файл admin,импортируем модуль admin_kb из которого будем доставать клавиатуру для админа 
+	from keyboards import admin_kb. 
+Теперь в хендлере проверка является ли пользовательл админом где бот отправляет 'Что хозяин надо?'добавим  reply_markup=admin_kb.button_case_admin,
+что бы админу отправлялась клавиатура.
+
+	#Проверка является ли пользовательл админом
+	# dp.message_handler(commands=['moderator'], is_chat_admin=True)
+	async def make_change_commands(message: types.Message):
+    		global ID
+    		ID = message.from_user.id
+    		await bot.send_message(message.from_user.id, 'Что нужно?', reply_markup=admin_kb.button_case_admin)
+    		await message.delete()
+____________________________
+
+Теперь сделаем так,что бы при нажатии клиентом на клавишу 'меню',после ввода /start,бот выдавал данные из БД.
+
+В файле sqlite_db.py создаем с пар-ом message ассинхронную ф-ию sql_read
+	async def sql_read(message):
+
+Здесь этот пар-р используется для отправки сообщения в личку.
+		
+
+Так же нам тут необходим экземпляр бота
+	from create_bot import bot  #импортируем экземпляр бота
+
+В ф-ию как аргумент message получаем событие нашего сообщения,когда срабатывает хендлер на кнопку 'Меню'.
+Далее в цикле for делаем sql команду'SELECT * FROM menu' ,т.е выбрать все из таблицы menu,применяем метод .fetchall() 
+(выгружает все данные из таблицы в виде списка) и помещаем это все в переменную ret.
+Т.е теперь в переменной ret получается список из строк таблицы.
+Далее через оператор await send_photo() отправляем каждую строку таблицы пользователю в личку message.from_user.id,разбирая ее:
+	непосредственно отпарвляем фотку ret[0]
+	формируем f строку,в которую отправляем название ret[1]
+	с новой строки \n описание ret[2]
+	с новой строки \n цену ret[-1]
+
+---вся функция:
+	async def sql_read(message):
+    		for ret in cur.execute('SELECT * FROM menu').fetchall():
+        		await bot.send_photo(message.from_user.id, ret[0], f'{ret[1]}\nОписание: {ret[2]}\nЦена {ret[-1]}')
+
+
+В файле client.py создаем хендлер 
+	@dp.message_handler(commands=['Меню'])
+	async def pizza_menu_command(message : types.Message):
+
+И импортируем sqlite_db из data_base в файле client.py 
+	from data_base import sqlite_db
+
+Далее в хендлере в ассинхнронной ф-ии, через оператор await запускаем ф-ию sql_read() и в нее нужно передать агумент message(т.к 
+ботом отвечаем в личку пользователю)
+	@dp.message_handler(commands=['Меню'])
+	async def cosmetiks_menu_command(message : types.Message):
+    		await sqlite_db.sql_read(message)
+
+Далее регистрируем этот хендлер в ф-ии register_handlers_client() как dp.register_message_handler(pizza_menu_command, commands=['Меню'])
+	# @dp.message_handler(commands=['Меню'])
+	async def cosmetiks_menu_command(message : types.Message):
+    		await sqlite_db.sql_read(message)
+	
+	dp.register_message_handler(cosmetiks_menu_command, commands=['Меню'])
+________________________________________
+--весь код файла sqlite_db
+
+	import sqlite3 as sq
+	from create_bot import bot  #импортируем экземпляр бота
+
+	def sql_start():
+    		global base, cur
+    		base = sq.connect('cosmetics_cool.db')
+    		cur = base.cursor()
+    		if base:
+        		print('Data base connected!')
+        		base.execute('CREATE TABLE IF NOT EXISTS menu(img TEXT, name TEXT PRIMARY KEY, description TEXT, price TEXT)')
+        		base.commit()
+
+	async def sql_add_command(state):
+    		async with state.proxy() as data:
+        		cur.execute('INSERT INTO menu VALUES (?, ?, ?, ?)', tuple(data.values()))
+        		base.commit()
+
+	async def sql_read(message):
+    		for ret in cur.execute('SELECT * FROM menu').fetchall():
+        		await bot.send_photo(message.from_user.id, ret[0], f'{ret[1]}\nОписание: {ret[2]}\nЦена {ret[-1]}')

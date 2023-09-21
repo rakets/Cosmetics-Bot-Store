@@ -2,7 +2,9 @@ from aiogram import types
 from aiogram import Dispatcher
 from create_bot import bot,dp
 
-from keyboards import kb_client
+from keyboards import kb_client   #импорт клавиатуры клиента
+
+from data_base import sqlite_db   #импорт модуля sqlite_db из пакета data_base,что бы потом запустить ф-ию считывания бд
 
 # @dp.message_handler(commands=['start', 'help'])
 async def commands_start(message : types.Message):
@@ -11,6 +13,10 @@ async def commands_start(message : types.Message):
         await message.delete()
     except:
         await message.reply('Общение с ботом через ЛС, напишите ему : \nhttps://t.me/cosmetic_menu_bot')
+
+# @dp.message_handler(commands=['Меню'])
+async def cosmetiks_menu_command(message : types.Message):
+    await sqlite_db.sql_read(message)
 
 # @dp.message_handler(commands=['Режим_работы'])
 async def pizza_open_command(message : types.Message):
@@ -26,3 +32,4 @@ def register_handlers_client(dp: Dispatcher):
     dp.register_message_handler(commands_start, commands=['start', 'help'])
     dp.register_message_handler(pizza_open_command, commands=['Режим_работы'])
     dp.register_message_handler(pizza_place_command, commands=['Расположение'])
+    dp.register_message_handler(cosmetiks_menu_command, commands=['Меню'])

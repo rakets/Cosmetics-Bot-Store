@@ -4,6 +4,8 @@ from create_bot import dp
 
 from handlers import client, other, admin   #импорт модулей,для запуска функций их хэндлеров
 
+from data_base import sqlite_db             #импорт модуля sqlite_db из пакета data_base
+
 '''-------логинг ошибок------'''
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -12,6 +14,7 @@ logging.basicConfig(level=logging.INFO)
 
 async def on_startup(_):
     print('бот вышел в чат')
+    sqlite_db.sql_start()                   #запуск ф-ии записи бд
 
 client.register_handlers_client(dp)         #запуск функии с хэндлерами модуля client
 admin.register_handlers_admin(dp)           #запуск функии с хэндлерами модуля admin

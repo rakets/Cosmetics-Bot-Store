@@ -12,6 +12,10 @@ from aiogram.dispatcher.filters import Text
 
 from create_bot import bot  #импорт экземпляра бота
 
+from data_base import sqlite_db     #импорт модуля sqlite_db из пакета data_base
+
+from keyboards import admin_kb      #импорт модуля admin_kb из которого будем доставать клавиатуру для админа
+
 ID = None
 
 class FSMAdmin(StatesGroup):
@@ -25,7 +29,7 @@ class FSMAdmin(StatesGroup):
 async def make_change_commands(message: types.Message):
     global ID
     ID = message.from_user.id
-    await bot.send_message(message.from_user.id, 'Что нужно?') #reply_markup=button_case_admin)
+    await bot.send_message(message.from_user.id, 'Что нужно?', reply_markup=admin_kb.button_case_admin)
     await message.delete()
 
 # Начало диалога(загрузка нового пунката меню)
@@ -84,8 +88,9 @@ async def load_price(message: types.Message, state: FSMContext):
     if message.from_user.id == ID:
         async with state.proxy() as data:
             data['price'] = float(message.text)
-        async with state.proxy() as data:
-            await message.reply(str(data))
+
+        await sqlite_db.sql_add_command(state)     #запуск ф-ии sql_add_command из модуля sqlite_db
+
         await state.finish()
 
 # Регистрация хендлеров

@@ -1,0 +1,63 @@
+Начнем с кнопок-ссылок.
+Создаем файл inline.py
+ 
+Делаем следующие импорты:
+	from aiogram import Bot, types
+	from aiogram.dispatcher import Dispatcher
+	from aiogram.utils import executor
+	import os
+Дополнительно нужно импортировать саму кнопку и клавиатуру 
+	from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+Создаем переменную клавиатуры:
+	Инициализируем класс клавиатуры InlineKeyboardMarkup
+	в аргументе прописываем ширину ряда row_width=1(т.е по одной кнопке в ряд)
+		#клавиатура
+		inlineKeyboard = InlineKeyboardMarkup(row_width=1)
+	
+Создадим несколько кнопок:
+Под каждую кнопку создаем отдельную переменную,инициализируем класс InlineKeyboardButton,
+в пар-р text записываем название кнопки и url(ссылка,куда приведет кнопка).
+	#кнопки ссылки
+	inlineButton1 = InlineKeyboardButton(text='YouTube', url='https://www.youtube.com/')
+	inlineButton2 = InlineKeyboardButton(text='HackYeah', url='https://hackyeah.pl/')
+
+Далее методом .add добавляем созданные кнопки в созданную клавиатуру:
+	inlineKeyboard.add(inlineButton1).add(inlineButton2)
+
+
+В файле handlers => client.py пишем простой хендлер,что бы вызвать эту клавиатуру на вызов 'ссылки':
+
+	Делаем все как и до этого в хендлерах
+	Только через message.answer() отвечаем на команду 'ссылки' отправкой клавиатуры
+		#хендлер,что бы вызвать клавиатуру cо ссылками
+		# @dp.message_handler(commands=['/ссылки'])
+		async def links_commands(message: types.Message):
+    			await message.answer('Ссылки:', reply_markup=inline.inlineKeyboard)
+	
+	Регистрация хендлера
+		dp.register_message_handler(links_commands, commands=['Ссылки'])
+	
+	Так же в файл client.py нужно импортировать модуль inline.py
+		from keyboards import inline      #импорт модуля inline из пакета keyboards,что бы потом отправить ссылки на 'ссылки'
+
+	что бы в хендлере достать клавиатуру со ссылками	inline.inlineKeyboard
+
+При вызове кнопки со ссылками будут возникать одна под другой,т.к указан row_width=1.Если указать 2,то будут располагаться горизонтально радом
+(не работало,нужно обновлять aiogram)
+________________________
+Так же инлайн кнопки можно добавлять не каждую в отдельную переменную,а все кнопки в один список x:
+
+x = [InlineKeyboardButton(text='Ссылка3', url='https://www.youtube.com'), InlineKeyboardButton(text='Ссылка4', url='https://www.youtube.com'),\
+     InlineKeyboardButton(text='Ссылка5', url='https://www.youtube.com')]
+
+Далее нужно применить метод row(),в пар-р передать список,распаковывая его через * :
+	 urlkb.add(urlButton, urlButton2).row(*x)
+________________
+Комментируем/удаляем ненужные импорты 
+	# from aiogram import Bot, types                     #импортируем класс Bot и types(спец.типы данных,что бы можно было писать аннотации типов в функциях)
+	# from aiogram.dispatcher import Dispatcher          #из aiogram.dispatcher импорт класса Dispatcher(бот сможет улавливать события)
+	# from aiogram.utils import executor
+
+	# import os
+	# from create_bot import dp                         #импорт экземпляра диспатчера

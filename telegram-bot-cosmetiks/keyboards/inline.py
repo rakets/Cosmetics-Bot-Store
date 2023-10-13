@@ -7,7 +7,9 @@
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton   #импорт кнопки и клавиатуры
 
-#клавиатура
+#------кнопоки-ссылки----------
+
+#клавиатура для кнопок-ссылок
 inlineKeyboard = InlineKeyboardMarkup(row_width=1)
 
 #кнопки ссылки
@@ -15,3 +17,16 @@ inlineButton1 = InlineKeyboardButton(text='You', url='https://www.youtube.com/')
 inlineButton2 = InlineKeyboardButton(text='Hack', url='https://hackyeah.pl/')
 
 inlineKeyboard.add(inlineButton1).add(inlineButton2)
+
+#-------колбек-кнопки-------------------------
+callbackKeyboard =InlineKeyboardMarkup(row_width=1)
+
+# callbackButton1 = InlineKeyboardButton(text='нажми кнопку', callback_data='www')
+# callbackKeyboard.add(callbackButton1)
+
+callbackKeyboard.add(InlineKeyboardButton(text='нажми кнопку', callback_data='www'))
+
+#------------колбек-голосование------------------
+
+callGoll = InlineKeyboardMarkup(row_width=1).add(InlineKeyboardButton(text='Like', callback_data='like_1'),\
+                                                 InlineKeyboardButton(text='No like', callback_data='like_-1'))

@@ -1,0 +1,167 @@
+ВСЕ ТЕЖЕ ПРАВИЛА РАСПОЛОЖЕНИЯ РАБОТАЮТ КАК ДЛЯ INLINE,ТАК И ДЛЯ CALLBACK-КНОПОК
+_________________________________
+
+CallBack кнопки.
+
+В файле keyboards/inline.py
+
+Создадим экземпляр клавиатуры с параметром ширины ряда callbackKeyboard = InlineKeyboardMarkup(row_width=1) и к ней просто через метод .add() добавим кнопку
+InlineKeyboardButton() с пар-ом text='текст,что отображается на кнопке' и пар-ом callback_data='имя события,которое произойдет' (фактически сюда
+передаем обычную строку,эта строка отправляется нашему боту,которое мы улавливаем спец.хендлером.Сюда можно передать как просто строку,так и какие-то
+данные на основании которых будет работать код)
+	#-------колбек-кнопки-------------------------
+	callbackKeyboard =InlineKeyboardMarkup(row_width=1)
+
+	callbackButton1 = InlineKeyboardButton(text='нажми', callback_data='www')
+
+	callbackKeyboard.add(callbackButton1)
+
+Далее необходимо записать простой хендлер,который срабатывает на команду test и отправлять нам инлайн кнопку.
+(в файле хендлерах клиента)
+	#хендлер,что бы уловить команду test и отправлять нам инлайн кнопку
+	# dp.message_handler(commands=['test'])
+	async def www_call(message: types.Message):
+    		print('handler srabotal')
+    		await message.answer('knopka:', reply_markup=inline.callbackKeyboard)
+
+регистрация хендлера
+	dp.register_message_handler(www_call, commands=['test'])
+
+
+Далее нужно записать специальных хендлер(callback_query_handler),что бы поймать callback_data событие www
+В его аргументах записваем text='название события,на которое он должен отработать'.
+Далее все точно так же записываем ассинхронную ф-ию,в которую нужно 
+записать пар-р(запишем callback,можно call,можно вообще любой),к нему нужно записать аннотацию типа : types.CallbackQuery.Далее нужно ответить на 
+нажатие на кнопку(тут можно исполнить любой код,хоть отпарсить сайт и вернуть результат).Для примера сделаем просто:запишем оператор await далее 
+callback.answer(т.к событие попадает в пар-р колбек,до этого все время писали message.answer(callback это просто переменная,.answer используется для
+отправки чего-либо в ответ)) и в скобках записываем ответ.
+	#хендлер,что бы уловить команду www
+	# @dp.callback_query_handler(text='www')
+	async def text_call(callback: types.CallbackQuery):
+    		print('handler callback srabotal')
+    		await callback.answer('knopka narzata')    #текст 'knopka narzata' отображается в виде всплывающего окошка
+
+регистрация хендлера
+	dp.register_callback_query_handler(text_call, text='www')
+
+обратите внимание на создание и регистрацию callback хендлера,используется register_callback_query_handler
+
+В случае callback.answer('Кнопка инлайн нажата') появляется вспылвающее окно 'Кнопка инлайн нажата',которое позже (+- 20сек) пропадает
+Если заменить на callback.message.answer 
+	await callback.message.answer('Кнопка инлайн нажата')
+бот отправляет сообщение 'Кнопка инлайн нажата' в чат,но часики так и остаются(т.к бот ожидает от нас подтверждения,о том,что код,который хотели 
+исполнить в query_handler исполнен).Поэтому нужно написать пустой ответ callback.answer()
+	await callback.answer()
+
+	#хендлер,что бы уловить команду www
+	# @dp.callback_query_handler(text='www')
+	async def text_call(callback: types.CallbackQuery):
+    		print('handler callback srabotal')
+    		# await callback.answer('knopka narzata')             #текст 'knopka narzata' отображается в виде всплывающего окошка
+    		await callback.message.answer('knopka narzata')     #текст 'knopka narzata' отправляется ботом в чат
+    		await callback.answer()
+
+Теперь при помощи callback.message.answer в чат приходит сообщение от бота,а при помощи callback.answer мы подтверждаем,что успешно отработали 
+все,что хотели(и часики сразу пропадают как только отработал наш код).
+Теперь если в callback.answer добавить какое-то сообщение,например await callback.answer('knopka narzata'),то будет появляться всплывающее окно.
+	#хендлер,что бы уловить команду www
+	# @dp.callback_query_handler(text='www')
+	async def text_call(callback: types.CallbackQuery):
+    		print('handler callback srabotal')
+    		# await callback.answer('knopka narzata')             #текст 'knopka narzata' отображается в виде всплывающего окошка
+    		await callback.message.answer('knopka narzata')     #текст 'knopka narzata' отправляется ботом в чат
+    		await callback.answer('knopka narzata')
+
+Если в callback.answer добавить второй аргумент show_alert как True
+	await callback.answer('knopka narzata', show_alert=True)
+то будет появляться уведомляещее окно,что пользователь нажал кнопку с подтверждением ОК,что бы явно уведомить пользователя (ОЧЕНЬ ПОЛЕЗНАЯ ШТУКА).
+
+Так же один хендлер может обрабатывать несколько инлайн кнопок.
+
+К примеру сделаем ГОЛОСОВАНИЕ:
+В файле inline.py cоздадим экземпляр клавиатуры с параметром ширины ряда callGoll = InlineKeyboardMarkup(row_width=1) и к ней просто через метод .add() добавим кнопку
+InlineKeyboardButton() с пар-ом text='Like' и пар-ом callback_data='like_1' и еще кнопку InlineKeyboardButton() с пар-ом text='No Like' и пар-ом callback_data='like_-1'.
+
+	callGoll = InlineKeyboardMarkup(row_width=1).add(InlineKeyboardButton(text='Like', callback_data='like_1'),\
+                                                 InlineKeyboardButton(text='No like', callback_data='like_-1'))
+
+Далее в файле хендлеров клиента при помощи хендлера отправляем эти кнопки:
+	#хендлер голосования
+	@dp.message_handler(commands=['golos'])
+	async def golos(message: types.Message):
+    		print('start golosowania')
+    		await message.answer('Golosowanie za....', reply_markup=inline.callGoll)
+
+Далее нужно хендлером обработать события,т.е нужно,что бы хендлер обрабатывал сразу два кэлбэка.
+Воспользуемся фильтром(можно писать лямбда,а можно использовать встроенный фильтр Text) импортируем from aiogram.dispatcher.filters import Text.
+В специальный хендлер callback_query_handler как аргумент записываем Text() и передаем в него то,как будем проверять(в нашем случае это общее like_),
+записываем через метод строк startswith(метод строк выбираем в зависимости от того какую проверку хотим сделать).
+	#хендлер обрабатывающий два колбека
+	@dp.callback_query_handler(Text(startswith='like_'))	
+
+
+Теперь хендлер будет срабатывать на один из двух колбеков.
+
+Далее нам нужно разобрать строку,которую получает хендлер,что бы применить какой-то код.
+В функции async def gol_call(callback : types.CallbackQuery) создаем переменную res в которую передаем callback.data (данные колбека) и с помощью метода строк .split()
+разбиваем по разделителю _ (получается список из двух значений) и берем второе значение(которое по индексом [1]).И все это переделываем в тип данных числовой(помещая все в
+int()).
+	#хендлер обрабатывающий два колбека
+	@dp.callback_query_handler(Text(startswith='like_'))
+	async def gol_call(callback: types.CallbackQuery):
+        	res = int(callback.data.split('_')[1])
+
+Далее отвечаем на этот колбек(записываем await callback.answer())
+	#хендлер обрабатывающий два колбека
+	@dp.callback_query_handler(Text(startswith='like_'))
+	async def gol_call(callback: types.CallbackQuery):
+    		res = int(callback.data.split('_')[1])
+    		await callback.answer('Wy progolosowali')
+
+Заведем словарь answ = dict() для подсчета.Заводить можно и базу данных,но для простоты заведем словарь.Добавил его переж хендлером голосования.
+
+Сделаем проверку,что бы пользователь не мог голосовать несколько раз подряд.
+Т.е записываем проверку 
+	if f'{callback.from_user.id}' not in answ:     (т.е вытягиваем id пользователя,который нажал на клавиатуру и проверяем есть ли он в словаре).
+
+Если его нет в словаре,то по ключу айдишник записываем результат,который сделал пользователь(1 или -1):
+        answ[f'{callback.from_user.id}'] = res         #добавляем id проголосовавшего пользователя и голос в словарь
+        await callback.answer('Wy progolosowali')
+
+Если уже есть в словаре,то:
+    	else:
+        	await callback.answer('Wy urze progolosowali')
+
+	
+	answ = dict()		#словарь для проверки и записи проголосовавших пользователей
+
+	#хендлер голосования
+	@dp.message_handler(commands=['golos'])
+	async def golos(message: types.Message):
+    		print('start golosowania')
+    		await message.answer('Golosowanie za....', reply_markup=inline.callGoll)
+	
+	#хендлер обрабатывающий два колбека
+	@dp.callback_query_handler(Text(startswith='like_'))
+	async def gol_call(callback: types.CallbackQuery):
+    		res = int(callback.data.split('_')[1])
+    		if f'{callback.from_user.id}' not in answ:         #проверка голосовал ли пользователь(есть ли id пользователя в словаре)
+        		answ[f'{callback.from_user.id}'] = res         #добавляем id проголосовавшего пользователя и голос в словарь
+        		await callback.answer('Wy progolosowali')
+    		else:
+        		await callback.answer('Wy urze progolosowali')
+
+!!! ЕСТЬ МОМЕНТ !!!:
+	Такой словарь использовать можно,но если бот будет перезапущен,то данные из словаря пропадут
+
+
+В файле хэндлеров админа я добавил,чтобы можно было узнать сколько пользователей проголосовало
+	# ------- это я добавил вывод в консоль количества проголосовавших пользователей,когда админ введет /ile   ------------
+	# @dp.message_handler(commands=['ile'])
+	# async def ile_golos(message: types.Message):
+	#     print(f'progolosovalo {len(client.answ)} polzovateley')    #достаем длину словаря answ,созданного при голосвании в файле client 
+	# ----------------------------------------------------------------------------------------------------- 
+	
+
+	
+

@@ -1,0 +1,87 @@
+Удаление записей из БД
+
+До этого мы сделали возможность добавления администратором записей в БД,теперь сделаем возможность удаления записей из БД (при помощи инлайн клавиатуры).	
+Переходим в handlers => admin.py .В модуле admin прописана машина состояний для загрузки администратором данных в БД.
+Допишем удаление пунктов меню.
+Для начала импортируем из aiogram.types необходимые компоненты для инлайн клавиатуры (InlineKeyboardMarkup, InlineKeyboardButton)
+	from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+Мы не пишем это в отдельно файле в папке keyboards,потому что будем использовать всего лишь одну кнопку и ее легко прописать прямо в коде админа,нет смысла выносить 
+ее отдельно.
+Тут нам потребуется обычный хэндлер и колбек хэндлер(для ответа).
+
+ЗАПИСЫВАЕМ ОБЫЧНЫЙ ХЕНДЛЕР message_handler,в котором добавляем администратору кнопку'Удалить'.
+	@dp.message_handler(commands='Удалить')
+	async def delete_item(message: types.Message):
+Проверяем по id,является ли он модераторем группы.
+	if message.from_user.id == ID:
+Если провeрку прошел:
+	Создаем переменную read,в ней через оператор await читаем и из модуля sqlite_db запускаем ф-ию sql.read2 
+		read = await sqlite_db.sql_read2()
+	
+	#хендлер удаления записи из БД
+	@dp.message_handler(commands='Удалить')
+	async def delete_item(message: types.Message):
+    		if message.from_user.id == ID:
+        	read = await sqlite_db.sql_read2()
+
+	В модуле sqlite_db создаем ф-ию sql_read2,которая предназначена,что бы прочитать выборку из БД(.execute('SELECT * FROM menu')) и извлечь эти данные(методом .fetchall()).
+	Через return возвращаем данные в место вызова ф-ии(в переменную read).
+	Ф-ия sql_read2 из модуля sqlite_db: 
+		async def sql_read2():
+    			return cur.execute('SELECT * FROM menu').fetchall()
+	
+	Далее в файле админа в хендлере по получившемуся списку проходим циклом for
+		for ret in read:
+	Отправляем нашему администратору(так же как и клиенту) фото,описание и цену нашей пиццы
+		await bot.send_photo(message.from_user.id, ret[0], f'{ret[1]}\nОписание: {ret[2]}\nЦена {ret[-1]}')
+	Но к каждому отправлению добавляем одну инлайн кнопку.Точно так же отправляем ее в личку,в текст пишем стрелки ^^^ (text='^^^') что бы было понятней к какой записи относится
+	кнопка, с помощью reply_markup создаем кнопку прямо тут,т.е создаем клавиатуру InlineKeyboardMarkup() и в нее добавляем кнопку .add(InlineKeyboardButton. В нее записываем Удалить
+	и подставляем название пиццы ({ret[1]}) и callback_data (что мы будем возвращать под именем данного события,в нашем случае f'del {ret[1]}' тут мы возвращаем название пиццы,т.к 
+	потом именно это название будем отправлять в БД как запрос для удаления) 
+		add(InlineKeyboardButton(f'Удалить {ret[1]}', callback_data=f'del {ret[1]}')))
+Весь хендлер: 
+	@dp.message_handler(commands='Удалить')
+	async def delete_item(message: types.Message):
+    		if message.from_user.id == ID:
+        		read = await sqlite_db.sql_read2()
+        		for ret in read:
+            			await bot.send_photo(message.from_user.id, ret[0], f'{ret[1]}\nОписание: {ret[2]}\nЦена {ret[-1]}')
+            			await bot.send_message(message.from_user.id, text='^^^', reply_markup=InlineKeyboardMarkup().\
+                                   			add(InlineKeyboardButton(f'Удалить {ret[1]}', callback_data=f'del {ret[1]}')))
+
+ЗАПИСЫВАЕМ КОЛБЕК КВЭРИ ХЕНДЛЕР callback_query_handler
+	Можно записать при помощи фильтра Text,а можно при помощи лямбда (lambda x: x.data and x.data.startswith('del ')),т.е проверяем,если события начинается с 'del ',то срабатывает этот
+	хендлер.
+		@dp.callback_query_handler(lambda x: x.data and x.data.startswith('del '))
+	Запускаем ф-ию (не описана,разобрать что делает):
+		async def del_callback_run(callback_query: types.CallbackQuery)
+	Далее первым делом из модуля sqlite_db запускаем ф-ию sql_delete_command.
+		    await sqlite_db.sql_delete_command(callback_query.data.replace('del ', ''))
+	В модуле sqlite_db в нее у нас передается data (название пиццы)
+		async def sql_delete_command(data):
+	мы тут из бд cur.execute посылаем sql-запрос удалить 'DELETE FROM menu WHERE name == ?' по названию конкретную запись (data,)  
+ 	Вся ф-ия sql_delete_command из модуля sqlite_db:
+		async def sql_delete_command(data):
+    			cur.execute('DELETE FROM menu WHERE name == ?', (data,))
+    			base.commit()
+	Далее в хендлере пишем 
+	
+		await callback_query.answer(text = f'{callback_query.data.replace("del ", "")} удалены', show_alert=True)
+	
+	тут callback_query как и в самом начале функции в хендлере (это всего лишь название пар-ра,назвать его можно как угодно).
+ 	callback_query.answer означает,что нам необходимо ответить телеграму о том,что запрос выполнен.
+	Параллельно с этим отправляем админу,что такая-то пицца удалена(записываем как f-строку f'{callback_query.data.replace("del ", "")} удалены' ,т.е мы из нашего события callback_query
+	берем data,далее нам нужно удалить конструкцию 'del ',оставив только название пиццы(это можно сделать методом .splite , можно .replace .Т.е методом .replace заменяем 'del ' на пустую 
+	строку "" и у нас просто остается название пиццы ({ret[1]})).И show_alert=True (запускаем всплывающее окошко,где нужно нажать ОК)
+	
+	Второй вариант ответа: 
+		bot.answer_callback_query(callback_query.id,text......)
+	
+	Весь КОЛБЕК КВЭРИ ХЕНДЛЕР
+		@dp.callback_query_handler(lambda x: x.data and x.data.startswith('del '))
+		async def del_callback_run(callback_query: types.CallbackQuery):
+    			await sqlite_db.sql_delete_command(callback_query.data.replace('del ', ''))
+    			await callback_query.answer(text = f'{callback_query.data.replace("del ", "")} удалены', show_alert=True)
+		 	
+
